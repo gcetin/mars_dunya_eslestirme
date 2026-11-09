@@ -1,0 +1,71 @@
+{
+  "created_utc": "2026-11-09T20:35:53+00:00",
+  "regions": [
+    [
+      -56.0,
+      83.0,
+      -179.0,
+      179.0
+    ],
+    [
+      -79.0,
+      -76.0,
+      160.0,
+      165.0
+    ]
+  ],
+  "window_m": 60000.0,
+  "stride_m": 20000.0,
+  "scales_m": [
+    1000.0,
+    2000.0,
+    4000.0
+  ],
+  "earth_grid_arcsec": 15,
+  "n_centers": 1155795,
+  "n_valid_windows": 324859,
+  "n_dem_tiles": 50801,
+  "failed_dem_tiles": [],
+  "failed_cover_tiles": [],
+  "feature_names": [
+    "slope_mean_1km",
+    "slope_std_1km",
+    "slope_p95_1km",
+    "tri_1km",
+    "rough_1km",
+    "slope_mean_2km",
+    "slope_std_2km",
+    "slope_p95_2km",
+    "tri_2km",
+    "rough_2km",
+    "slope_mean_4km",
+    "slope_std_4km",
+    "slope_p95_4km",
+    "tri_4km",
+    "rough_4km",
+    "relief",
+    "elev_std",
+    "hypso",
+    "skew",
+    "radial_r2",
+    "basin_depth"
+  ],
+  "method": "Her gövde için aynı işlem: kaynak pikselin desteğini hesaba katan Gauss alçak geçiren filtre (sigma = ölçek × 0,5), kendi yarıçapıyla yerel azimutal eşit uzaklık ızgarasına yeniden örnekleme, ardından yalnızca metre cinsinden yerel morfoloji özellikleri. Mutlak yükseklik ve koordinat gövdeler arasında karşılaştırılmaz.",
+  "data_sources": {
+    "mars_dem": "MGS MOLA MEGDR 128 ppd (USGS global mosaic) — https://planetarymaps.usgs.gov/mosaic/Mars_MGS_MOLA_DEM_mosaic_global_463m.tif",
+    "moon_dem": "LRO LOLA LDEM 256 ppd (USGS global mosaic, Mar 2014) — https://planetarymaps.usgs.gov/mosaic/Lunar_LRO_LOLA_Global_LDEM_118m_Mar2014.tif",
+    "earth_dem": "NASADEM_HGT v001 (NASA JPL; Microsoft Planetary Computer COG), 56°G–60°K; Copernicus DEM GLO-90 (AWS Open Data), 60°K üstü ve 56°G altı",
+    "land_cover": "ESA WorldCover 10 m 2021 v200"
+  },
+  "software": {
+    "analog_finder": "0.1.0",
+    "python": "3.13.7",
+    "gdal": "3.12.2",
+    "numpy": "2.5.4",
+    "scipy": "1.18.1",
+    "pandas": "3.1.1",
+    "rasterio": "1.5.2"
+  },
+  "seconds_fetch": 28,
+  "seconds_features": 276
+}

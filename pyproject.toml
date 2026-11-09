@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "analog-finder"
+version = "0.1.0"
+description = "Planetary Analog Finder: explainable, multi-scale terrain matching between Mars/Moon and Earth."
+requires-python = ">=3.11"
+dependencies = [
+    "numpy",
+    "scipy",
+    "pandas",
+    "pyarrow",
+    "rasterio",
+    "matplotlib",
+    "requests",
+    "pystac-client",
+    "streamlit",
+    "folium",
+    "streamlit-folium",
+    "plotly",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "nbformat", "nbclient", "ipykernel"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = ["network: reads real remote data"]
+addopts = "-m 'not network'"
