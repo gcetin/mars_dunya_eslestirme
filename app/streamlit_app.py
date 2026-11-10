@@ -34,7 +34,7 @@ from analog_finder.similarity import (
 )
 from analog_finder.sites import KNOWN_ANALOGS, REFERENCE_SITES
 from analog_finder.surface import PRODUCT as S2_PRODUCT, surface_for_window
-from analog_finder.terrain import hillshade, hypsometric_curve, radial_profile, slope_cdf
+from analog_finder.terrain import PROFILE_SHIFT_M, hillshade, hypsometric_curve, radial_profile, slope_cdf
 
 st.set_page_config(page_title="Planetary Analog Finder", page_icon="🪐", layout="wide")
 
@@ -400,10 +400,23 @@ with chart_b:
     x_b, y_b = hypsometric_curve(grid_cand)
     st.plotly_chart(two_line_chart(x_a, y_a, x_b, y_b, "Daha yüksekte kalan alan payı", "Bağıl yükseklik", body.name, "%{x:.0%}: %{y:.2f}<extra></extra>"), width="stretch", config={"displayModeBar": False})
 with chart_c:
-    st.markdown("**Merkezden radyal profil**")
-    r_a, p_a, _ = radial_profile(grid_ref, SCALE)
-    r_b, p_b, _ = radial_profile(grid_cand, SCALE)
-    st.plotly_chart(two_line_chart(r_a / 1000, p_a, r_b / 1000, p_b, "Merkezden uzaklık (km)", "Bağıl yükseklik (m)", body.name, "%{x:.0f} km: %{y:.0f} m<extra></extra>"), width="stretch", config={"displayModeBar": False})
+    st.markdown("**Radyal profil**")
+    prof_a, prof_b = reference.profile, candidate_features.profile
+    if prof_a is not None and prof_b is not None:
+        st.plotly_chart(two_line_chart(prof_a.radius_m / 1000, prof_a.shape, prof_b.radius_m / 1000, prof_b.shape, "Profil merkezinden uzaklık (km)", "Halka ortalaması (σ)", body.name, "%{x:.1f} km: %{y:.2f} σ<extra></extra>"), width="stretch", config={"displayModeBar": False})
+
+        def shift(profile) -> str:
+            return f"{np.hypot(profile.dx_m, profile.dy_m) / 1000:.0f} km"
+
+        st.caption(
+            f"Merkez, pencere merkezinin {PROFILE_SHIFT_M / 1000:.0f} km çevresinde en simetrik nokta olarak arandı "
+            f"(kayma: {body.name} {shift(prof_a)}, aday {shift(prof_b)}). σ: penceredeki yükseklik oynaklığı. "
+            f"Simetri R²: {body.name} {prof_a.r2:.2f}, aday {prof_b.r2:.2f}."
+        )
+    else:
+        r_a, p_a, _ = radial_profile(grid_ref, SCALE)
+        r_b, p_b, _ = radial_profile(grid_cand, SCALE)
+        st.plotly_chart(two_line_chart(r_a / 1000, p_a, r_b / 1000, p_b, "Merkezden uzaklık (km)", "Bağıl yükseklik (m)", body.name, "%{x:.0f} km: %{y:.0f} m<extra></extra>"), width="stretch", config={"displayModeBar": False})
 
 with st.expander("Özellik tablosu: her özelliğin farka katkısı"):
     frame = reasons.copy()

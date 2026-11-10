@@ -20,8 +20,9 @@ EARTH_DEM_NOTES = {
 METHOD = (
     "Her gövde için aynı işlem: kaynak pikselin desteğini hesaba katan Gauss alçak geçiren filtre "
     "(sigma = ölçek × 0,5), kendi yarıçapıyla yerel azimutal eşit uzaklık ızgarasına yeniden örnekleme, "
-    "ardından yalnızca metre cinsinden yerel morfoloji özellikleri. Mutlak yükseklik ve koordinat "
-    "gövdeler arasında karşılaştırılmaz."
+    "ardından yalnızca metre cinsinden yerel morfoloji özellikleri. Radyal profil, pencere merkezinin "
+    "15 km çevresinde en simetrik merkez aranarak 12 halkada hesaplanır ve penceredeki yükseklik "
+    "oynaklığına bölünür. Mutlak yükseklik ve koordinat gövdeler arasında karşılaştırılmaz."
 )
 
 

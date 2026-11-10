@@ -7,9 +7,13 @@ import pytest
 from analog_finder.landcover import COLUMNS
 from analog_finder.similarity import (
     DEFAULT_WEIGHTS,
+    FAMILIES,
     Filters,
+    Normalizer,
     explain,
+    family_of,
     feature_weights,
+    label_of,
     rank_candidates,
 )
 from analog_finder.terrain import feature_names
@@ -30,6 +34,8 @@ def make_catalog(n: int = 2000, seed: int = 1) -> pd.DataFrame:
             data[name] = rng.normal(0, 1, n)
         elif name == "basin_depth":
             data[name] = rng.normal(0, 300, n)
+        elif name.startswith("rprof_"):
+            data[name] = rng.normal(0, 0.8, n)
         else:
             data[name] = rng.lognormal(1.5, 0.8, n)
     frame = pd.DataFrame(data)
@@ -52,13 +58,11 @@ def test_identical_window_ranks_first_with_zero_distance():
 
 def test_absolute_units_do_not_dominate():
     """Equal family weights must hold even if families have many members."""
-    weights = feature_weights(NAMES, {"slope": 1, "ruggedness": 1, "relief": 1, "shape": 1})
-    families = {"slope": 0.0, "ruggedness": 0.0, "relief": 0.0, "shape": 0.0}
-    from analog_finder.similarity import family_of
-
+    weights = feature_weights(NAMES, dict.fromkeys(FAMILIES, 1))
+    families = dict.fromkeys(FAMILIES, 0.0)
     for name, weight in zip(NAMES, weights):
         families[family_of(name)] += weight
-    assert all(value == pytest.approx(0.25) for value in families.values())
+    assert all(value == pytest.approx(1 / len(FAMILIES)) for value in families.values())
 
 
 def test_filter_removes_vegetated_windows():
@@ -126,3 +130,41 @@ def test_locate_reports_distance_for_arbitrary_window():
     assert ranking.locate(reference)[0] == pytest.approx(0.0)
     assert ranking.locate(reference)[1] > 99.9
     assert ranking.locate(catalog.iloc[10][NAMES].to_dict())[0] > 0
+
+
+def test_profile_rings_share_one_scale():
+    catalog = make_catalog()
+    catalog["rprof_00"] *= 5.0
+    normalizer = Normalizer.fit(catalog, NAMES)
+    scales = {n: s for n, s in zip(NAMES, normalizer.scale) if n.startswith("rprof_")}
+    assert len(set(scales.values())) == 1
+    assert all(family_of(n) == "profile" for n in scales)
+
+
+def test_zero_profile_weight_reproduces_ranking_without_profile():
+    catalog = make_catalog()
+    reference = catalog.iloc[42][NAMES].to_dict()
+    old_names = [n for n in NAMES if not n.startswith("rprof_")]
+    weights = {**DEFAULT_WEIGHTS, "profile": 0.0}
+    with_rings = rank_candidates(reference, catalog, NAMES, family_weights=weights, top_n=8, stability_draws=20)
+    without = rank_candidates(reference, catalog, old_names, family_weights=weights, top_n=8, stability_draws=20)
+    assert with_rings.table["lat"].tolist() == without.table["lat"].tolist()
+    assert with_rings.table["distance"].to_numpy() == pytest.approx(without.table["distance"].to_numpy())
+
+
+def test_profile_weight_finds_the_matching_curve():
+    catalog = make_catalog()
+    reference = catalog.iloc[77][NAMES].to_dict()
+    twin = catalog.iloc[[500]].copy()
+    for name in NAMES:
+        if name.startswith("rprof_"):
+            twin[name] = reference[name]
+    catalog = pd.concat([catalog, twin], ignore_index=True)
+    only_profile = dict.fromkeys(FAMILIES, 0.0) | {"profile": 1.0}
+    ranking = rank_candidates(reference, catalog, NAMES, family_weights=only_profile, top_n=3, stability_draws=20)
+    assert set(ranking.table["lat"].round(6)) >= {round(catalog.iloc[77]["lat"], 6), round(catalog.iloc[-1]["lat"], 6)}
+
+
+def test_profile_labels_name_the_ring():
+    assert label_of("rprof_00") == ("Radyal profil, 0–2,5 km halkası", "σ")
+    assert label_of("rprof_11")[0].endswith("29,5 km halkası")

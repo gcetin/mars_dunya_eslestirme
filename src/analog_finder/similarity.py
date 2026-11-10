@@ -8,8 +8,10 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
-FAMILIES = {"slope": "Eğim", "ruggedness": "Engebelilik", "relief": "Rölyef", "shape": "Biçim"}
-DEFAULT_WEIGHTS = {"slope": 0.30, "ruggedness": 0.25, "relief": 0.15, "shape": 0.30}
+from .terrain import DEFAULT_WINDOW_M, PROFILE_BINS, PROFILE_PREFIX
+
+FAMILIES = {"slope": "Eğim", "ruggedness": "Engebelilik", "relief": "Rölyef", "shape": "Biçim", "profile": "Radyal profil"}
+DEFAULT_WEIGHTS = {"slope": 0.30, "ruggedness": 0.25, "relief": 0.15, "shape": 0.30, "profile": 0.0}
 
 # Relative weight of a feature within its family, by analysis scale. Rebuilding
 # Earth DEMs from real MOLA track patterns changes 1 km features by 8-17 %, but
@@ -35,8 +37,14 @@ def _base(name: str) -> str:
     return name.rsplit("_", 1)[0] if name.endswith("km") else name
 
 
+def is_profile(name: str) -> bool:
+    return name.startswith(PROFILE_PREFIX)
+
+
 def family_of(name: str) -> str:
     base = _base(name)
+    if is_profile(base):
+        return "profile"
     if base.startswith("slope"):
         return "slope"
     if base in ("tri", "rough"):
@@ -46,8 +54,22 @@ def family_of(name: str) -> str:
     return "shape"
 
 
+def _km(value_m: float) -> str:
+    return f"{value_m / 1000:.1f}".rstrip("0").rstrip(".").replace(".", ",")
+
+
 def label_of(name: str) -> tuple[str, str]:
-    """Human-readable name and unit of a feature."""
+    """Human-readable name and unit of a feature.
+
+    Profile rings are labelled for the catalog's 60 km window, whose disc has
+    a radius of 29.5 km at 1 km spacing.
+    """
+    if name == "rprof":
+        return "Radyal profil (tüm halkalar)", "σ"
+    if is_profile(name):
+        ring = int(name.removeprefix(PROFILE_PREFIX))
+        width = (DEFAULT_WINDOW_M / 2 - 500.0) / PROFILE_BINS
+        return f"Radyal profil, {_km(ring * width)}–{_km((ring + 1) * width)} km halkası", "σ"
     label, unit = _LABELS[_base(name)]
     if name.endswith("km"):
         label = f"{label} @ {name.rsplit('_', 1)[1].removesuffix('km')} km"
@@ -60,14 +82,19 @@ def transform(name: str, values):
     values = np.asarray(values, dtype="float64")
     if base == "basin_depth":
         return np.arcsinh(values / 100.0)
-    if base in ("hypso", "skew", "radial_r2"):
+    if base in ("hypso", "skew", "radial_r2") or is_profile(base):
         return values
     return np.log1p(values)
 
 
 @dataclass
 class Normalizer:
-    """Robust centring and scaling learned from the Earth window population."""
+    """Robust centring and scaling learned from the Earth window population.
+
+    The rings of the radial profile share one scale, the median of their
+    interquartile ranges, so the profile is compared as one curve in its own
+    units rather than ring by ring.
+    """
 
     names: list[str]
     center: np.ndarray
@@ -78,6 +105,9 @@ class Normalizer:
         matrix = np.column_stack([transform(n, catalog[n].to_numpy()) for n in names])
         q25, q50, q75 = np.nanpercentile(matrix, [25, 50, 75], axis=0)
         scale = q75 - q25
+        rings = np.array([is_profile(n) for n in names])
+        if rings.any():
+            scale[rings] = np.median(scale[rings])
         scale[scale == 0] = 1.0
         return cls(names, q50, scale)
 

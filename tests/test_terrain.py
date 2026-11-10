@@ -8,8 +8,11 @@ import pytest
 from analog_finder.bodies import EARTH, MARS, Body
 from analog_finder.dem import Patch
 from analog_finder.terrain import (
+    PROFILE_FEATURES,
     aeqd_to_latlon,
+    centred_profile,
     extract_features,
+    read_half_m,
     radial_profile,
     resample_to_scale,
     scale_features,
@@ -135,3 +138,88 @@ def test_nan_gap_is_tolerated_but_large_holes_invalidate():
     result = extract_features(patch, 10.0, 40.0)
     assert result.valid_frac < 0.95
     assert math.isnan(result.values["slope_mean_1km"])
+
+
+def _crater(x, y, depth: float = 600.0, radius_m: float = 22_000.0, rim: float = 200.0):
+    """Flat floor, wall up to a raised rim, and an exterior that falls away."""
+    r = np.hypot(x, y) / radius_m
+    floor_edge = 0.7
+    wall = -depth + (depth + rim) * np.clip((r - floor_edge) / (1 - floor_edge), 0, 1)
+    outside = rim * np.minimum(1.0, 1.0 / np.maximum(r, 1e-9) ** 3)
+    return np.where(r <= 1, wall, outside)
+
+
+def _wide_grid(func, cx: float = 0.0, cy: float = 0.0, n: int = 60, k: int = 15, spacing: float = 1000.0):
+    axis = (np.arange(n + 2 * k) - (n + 2 * k - 1) / 2) * spacing
+    x, y = np.meshgrid(axis, axis[::-1])
+    return func(x - cx, y - cy)
+
+
+def test_centred_profile_finds_an_offset_crater():
+    centred = centred_profile(_wide_grid(_crater), 1000.0, 60)
+    offset = centred_profile(_wide_grid(_crater, cx=9_000.0, cy=-7_000.0), 1000.0, 60)
+    assert (centred.dx_m, centred.dy_m) == (0.0, 0.0)
+    assert offset.dx_m == pytest.approx(9_000.0, abs=1000.0)
+    assert offset.dy_m == pytest.approx(-7_000.0, abs=1000.0)
+    assert offset.r2 == pytest.approx(centred.r2, abs=0.02)
+    assert offset.shape == pytest.approx(centred.shape, abs=0.08)
+
+
+def test_centred_profile_shape_ignores_depth_tilt_and_datum():
+    grid = _wide_grid(_crater)
+    axis = (np.arange(90) - 44.5) * 1000.0
+    x, y = np.meshgrid(axis, axis[::-1])
+    a = centred_profile(grid, 1000.0, 60)
+    b = centred_profile(3.0 * grid + 0.02 * x - 0.01 * y - 4000.0, 1000.0, 60)
+    assert a.shape == pytest.approx(b.shape, abs=1e-6)
+    assert a.r2 == pytest.approx(b.r2, abs=1e-9)
+
+
+def test_profile_amplitude_carries_symmetry():
+    profile = centred_profile(_wide_grid(_crater), 1000.0, 60)
+    assert profile.r2 > 0.95
+    # Mean of shape² weighted by ring size equals R².
+    from analog_finder.terrain import _disc_template
+
+    counts = _disc_template(60, 1000.0, 12)[5]
+    assert np.sum(counts * profile.shape**2) / counts.sum() == pytest.approx(profile.r2)
+    ridge = _wide_grid(lambda x, y: 400 * np.exp(-(x / 6000.0) ** 2))
+    assert centred_profile(ridge, 1000.0, 60).r2 < 0.3
+
+
+def test_crater_and_closed_basin_have_different_profiles():
+    """Both are radially symmetric, so only the profile can tell them apart."""
+    crater = centred_profile(_wide_grid(_crater), 1000.0, 60)
+    basin = centred_profile(_wide_grid(lambda x, y: 600 * (np.hypot(x, y) / 30_000.0) ** 1.5), 1000.0, 60)
+    assert basin.r2 > 0.9
+    assert np.sqrt(np.mean((crater.shape - basin.shape) ** 2)) > 0.3
+
+
+def test_missing_data_limits_the_search_but_keeps_the_centre():
+    grid = _wide_grid(_crater, cx=9_000.0)
+    grid[:, 75:] = np.nan  # no data east of the window
+    profile = centred_profile(grid, 1000.0, 60)
+    assert np.isfinite(profile.shape).all()
+    assert profile.dx_m <= 1000.0  # the disc may still move one cell and stay on data
+    grid[44, 44] = np.nan
+    with pytest.raises(ValueError, match="missing data"):
+        centred_profile(grid, 1000.0, 60)
+
+
+def test_extract_features_recentres_the_profile_on_mars():
+    shifted = lambda x, y: _crater(x - 10_000.0, y)
+    patch = synthetic_patch(MARS, 18.0, 77.0, read_half_m(), 463.0, shifted)
+    features = extract_features(patch, 18.0, 77.0)
+    assert features.profile.dx_m == pytest.approx(10_000.0, abs=1000.0)
+    assert features.profile.r2 > 0.9
+    assert all(np.isfinite(features.values[name]) for name in PROFILE_FEATURES)
+
+
+def test_flat_window_has_a_zero_profile():
+    """Rounding noise on a lake surface must not look like a symmetric structure."""
+    rng = np.random.default_rng(0)
+    lake = np.round(rng.normal(0, 0.3, (90, 90)))
+    profile = centred_profile(lake, 1000.0, 60)
+    assert profile.r2 == 0.0
+    assert (profile.shape == 0).all()
+    assert (profile.dx_m, profile.dy_m) == (0.0, 0.0)

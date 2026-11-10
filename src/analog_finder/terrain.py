@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from functools import lru_cache
 
 import numpy as np
 from scipy import ndimage
@@ -35,14 +36,33 @@ MIN_SCALE_PER_PIXEL = 1.9
 PER_SCALE_FEATURES = ("slope_mean", "slope_std", "slope_p95", "tri", "rough")
 WINDOW_FEATURES = ("relief", "elev_std", "hypso", "skew", "radial_r2", "basin_depth")
 
+# Radial profile around the most symmetric nearby centre. Catalog windows are
+# 20 km apart, so a structure's centre can lie up to 14.1 km from the nearest
+# window centre; the search covers that distance.
+PROFILE_BINS = 12
+PROFILE_SHIFT_M = 15_000.0
+PROFILE_PREFIX = "rprof_"
+PROFILE_FEATURES = tuple(f"{PROFILE_PREFIX}{i:02d}" for i in range(PROFILE_BINS))
+# Centres are first tried on a lattice this many cells apart, then refined.
+PROFILE_COARSE_CELLS = 3
+# Below this detrended standard deviation a disc is flat at DEM precision
+# (Earth tiles are stored in whole metres), and its profile would be noise.
+PROFILE_MIN_SD_M = 1.0
+
 
 def margin_m(scales_m=DEFAULT_SCALES_M) -> float:
     return MARGIN_PER_SCALE * max(scales_m)
 
 
+def read_half_m(window_m: float = DEFAULT_WINDOW_M, scales_m=DEFAULT_SCALES_M) -> float:
+    """Half-width of the DEM patch that every feature of a window needs."""
+    profile_reach = PROFILE_SHIFT_M + MARGIN_PER_SCALE * min(scales_m)
+    return window_m / 2 + max(margin_m(scales_m), profile_reach)
+
+
 def feature_names(scales_m=DEFAULT_SCALES_M) -> list[str]:
     names = [f"{name}_{s / 1000:g}km" for s in scales_m for name in PER_SCALE_FEATURES]
-    return names + list(WINDOW_FEATURES)
+    return names + list(WINDOW_FEATURES) + list(PROFILE_FEATURES)
 
 
 def aeqd_to_latlon(x, y, lat0: float, lon0: float, radius: float):
@@ -142,6 +162,116 @@ def radial_profile(z: np.ndarray, spacing_m: float, bins: int = 12):
     return centres, means, r2
 
 
+@dataclass
+class CentredProfile:
+    """Radial profile around the most radially symmetric centre near a window.
+
+    ``shape`` is the azimuthal mean of plane-detrended elevation in each ring,
+    divided by the standard deviation of all detrended cells in the disc. It
+    is dimensionless, so crater depth, which scales with gravity, does not
+    enter; its amplitude grows with symmetry, since the ring-size-weighted
+    mean of ``shape**2`` equals ``r2``.
+    """
+
+    radius_m: np.ndarray
+    shape: np.ndarray
+    r2: float
+    dx_m: float  # profile centre east of the window centre
+    dy_m: float  # profile centre north of the window centre
+
+    def values(self) -> dict[str, float]:
+        return {name: float(v) for name, v in zip(PROFILE_FEATURES, self.shape)}
+
+
+@lru_cache(maxsize=8)
+def _disc_template(n: int, spacing_m: float, bins: int):
+    """Cells of the disc inscribed in an n × n grid, with ring index and plane fit."""
+    y, x = np.mgrid[:n, :n]
+    east = (x - (n - 1) / 2) * spacing_m
+    north = ((n - 1) / 2 - y) * spacing_m
+    r = np.hypot(east, north)
+    r_max = (n - 1) / 2 * spacing_m
+    inside = r <= r_max
+    ring = np.minimum((r[inside] / r_max * bins).astype(int), bins - 1)
+    design = np.column_stack([east[inside], north[inside], np.ones(int(inside.sum()))])
+    counts = np.bincount(ring, minlength=bins).astype("float64")
+    ring_mean = np.zeros((ring.size, bins))
+    ring_mean[np.arange(ring.size), ring] = 1.0 / counts[ring]
+    centres = (np.arange(bins) + 0.5) / bins * r_max
+    return y[inside], x[inside], design, np.linalg.pinv(design), ring_mean, counts, centres
+
+
+def _disc_fit(z_ext, k, template, shifts):
+    """Symmetry R², ring means and residual sum of squares for each centre shift (cells)."""
+    rows, cols, design, pinv, ring_mean, counts, _ = template
+    values = z_ext[k + rows[None, :] + shifts[:, :1], k + cols[None, :] + shifts[:, 1:]]
+    ok = np.isfinite(values).all(axis=1)
+    values, shifts = values[ok], shifts[ok]
+    residual = values - (values @ pinv.T) @ design.T
+    means = residual @ ring_mean
+    total = np.sum(residual**2, axis=1)
+    # Residuals of a fit with an intercept have zero mean, so the between-ring
+    # sum of squares is the explained part.
+    explained = means**2 @ counts
+    r2 = np.divide(explained, total, out=np.zeros_like(total), where=total > 0)
+    return shifts, r2, means, total
+
+
+def _lattice(step: int, reach: int, limit: int, around=(0, 0)) -> np.ndarray:
+    """Shifts on a square lattice through ``around``, within ``limit`` cells of the window centre."""
+    offsets = np.arange(-(reach // step) * step, reach + 1, step)
+    sy, sx = np.meshgrid(offsets + around[0], offsets + around[1], indexing="ij")
+    shifts = np.column_stack([sy.ravel(), sx.ravel()])
+    shifts = shifts[np.hypot(shifts[:, 0], shifts[:, 1]) <= limit]
+    # Nearest first, so that ties keep the shift closest to the window centre.
+    return shifts[np.argsort(np.abs(shifts).sum(axis=1), kind="stable")]
+
+
+def centred_profile(z_ext: np.ndarray, spacing_m: float, n: int, max_shift_m: float = PROFILE_SHIFT_M, bins: int = PROFILE_BINS) -> CentredProfile:
+    """Radial profile of a disc of ``n`` cells across, centred where it is most symmetric.
+
+    ``z_ext`` is a square grid whose centre is the window centre, with ``k``
+    extra cells on each side, ``k = max_shift_m // spacing_m``. Candidate
+    centres within ``max_shift_m`` are tried on a coarse lattice and then
+    refined cell by cell. A centre is only used if its whole disc has data;
+    the window centre itself must always qualify. A window that is flat at
+    DEM precision gets a zero profile at its own centre.
+    """
+    k = int(max_shift_m // spacing_m)
+    if z_ext.shape != (n + 2 * k, n + 2 * k):
+        raise ValueError(f"Expected a {n + 2 * k}-cell grid, got {z_ext.shape}.")
+    template = _disc_template(n, float(spacing_m), bins)
+    cells = template[0].size
+    centres = template[-1]
+    step = PROFILE_COARSE_CELLS
+
+    shifts, r2, _, total = _disc_fit(z_ext, k, template, _lattice(step, k, k))
+    if shifts.size == 0 or shifts[0].any():
+        raise ValueError("The disc around the window centre has missing data.")
+    if math.sqrt(total[0] / cells) < PROFILE_MIN_SD_M:
+        return CentredProfile(centres, np.zeros(bins), 0.0, 0.0, 0.0)
+    # The refinement includes the coarse optimum, so it can only improve on it.
+    best = tuple(shifts[int(np.argmax(r2))])
+    shifts, r2, means, total = _disc_fit(z_ext, k, template, _lattice(1, step - 1, k, best))
+    i = int(np.argmax(r2))
+    sd = math.sqrt(total[i] / cells)
+    shape = means[i] / sd if sd > 0 else np.zeros(bins)
+    return CentredProfile(centres, shape, float(r2[i]), float(shifts[i, 1] * spacing_m), float(-shifts[i, 0] * spacing_m))
+
+
+def window_profile(patch: Patch, lat0: float, lon0: float, window_m: float, spacing_m: float, window_grid: np.ndarray) -> CentredProfile:
+    """Centred radial profile of a window, searching as far as the patch allows.
+
+    ``window_grid`` is the gap-filled window at ``spacing_m``; it replaces the
+    centre of the wider grid so the window centre is always a valid choice.
+    """
+    k = int(PROFILE_SHIFT_M // spacing_m)
+    n = window_grid.shape[0]
+    wide = resample_to_scale(patch, lat0, lon0, window_m + 2 * k * spacing_m, spacing_m)
+    wide[k : k + n, k : k + n] = window_grid
+    return centred_profile(wide, spacing_m, n, PROFILE_SHIFT_M)
+
+
 def hypsometric_curve(z: np.ndarray, points: int = 41):
     """Share of the area above each normalised elevation."""
     low, high = np.percentile(z, [1, 99])
@@ -199,6 +329,7 @@ class Features:
     values: dict[str, float]
     valid_frac: float
     grids: dict[float, np.ndarray]
+    profile: CentredProfile | None = None
 
 
 def extract_features(
@@ -211,7 +342,9 @@ def extract_features(
     """Compute the multi-scale feature vector of one window.
 
     ``valid_frac`` is the share of finest-scale cells backed by data. Values
-    are NaN when it is below 0.95.
+    are NaN when it is below 0.95. The radial profile searches for its centre
+    only as far as the patch reaches; read ``read_half_m`` around the centre
+    for the full search.
     """
     grids = {s: resample_to_scale(patch, lat0, lon0, window_m, s) for s in scales_m}
     finest = min(scales_m)
@@ -226,7 +359,9 @@ def extract_features(
         for name, value in scale_features(filled[s], s).items():
             values[f"{name}_{s / 1000:g}km"] = value
     values.update(window_features(filled[finest], finest))
-    return Features(values, valid_frac, filled)
+    profile = window_profile(patch, lat0, lon0, window_m, finest, filled[finest])
+    values.update(profile.values())
+    return Features(values, valid_frac, filled, profile)
 
 
 def _fill(z: np.ndarray) -> np.ndarray:

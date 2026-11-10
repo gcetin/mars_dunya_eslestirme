@@ -21,7 +21,17 @@ from . import landcover
 from .bodies import EARTH
 from .dem import _extent_deg, default_earth_source, earth_tile_path, fetch_earth_tile, read_earth_patch
 from .provenance import METHOD, data_sources, software_versions, utc_now
-from .terrain import DEFAULT_SCALES_M, DEFAULT_WINDOW_M, extract_features, feature_names, margin_m
+from .terrain import (
+    DEFAULT_SCALES_M,
+    DEFAULT_WINDOW_M,
+    PROFILE_BINS,
+    PROFILE_PREFIX,
+    PROFILE_SHIFT_M,
+    extract_features,
+    feature_names,
+    margin_m,
+    read_half_m,
+)
 
 ARCSEC = 15
 MAX_SEA_FRAC = 0.3
@@ -50,13 +60,15 @@ def window_centers(regions, window_m: float, stride_m: float) -> list[tuple[floa
 
 def _tiles_for(centers, window_m: float) -> tuple[set, set]:
     """1° DEM tiles and 3° land-cover tiles needed by a list of centres."""
-    half_m = window_m / 2 + margin_m()
+    dem_half_m = read_half_m(window_m)
+    cover_half_m = window_m / 2 + margin_m()
     dem, cover = set(), set()
     for lat, lon in centers:
-        half_lat, half_lon = _extent_deg(EARTH, lat, half_m)
+        half_lat, half_lon = _extent_deg(EARTH, lat, dem_half_m)
         for la in range(math.floor(lat - half_lat), math.floor(lat + half_lat) + 1):
-            for lo in range(math.floor(lon - half_lon), math.floor(lon + half_lon) + 1):
+            for lo in range(max(math.floor(lon - half_lon), -180), min(math.floor(lon + half_lon), 179) + 1):
                 dem.add((la, lo))
+        half_lat, half_lon = _extent_deg(EARTH, lat, cover_half_m)
         for la in range(landcover.tile_floor(lat - half_lat), landcover.tile_floor(lat + half_lat) + 3, 3):
             for lo in range(landcover.tile_floor(lon - half_lon), landcover.tile_floor(lon + half_lon) + 3, 3):
                 cover.add((la, lo))
@@ -120,17 +132,36 @@ def _process_chunk(args) -> list[dict]:
     half_m = window_m / 2 + margin_m(scales)
     rows = []
     for lat, lon in centers:
+        # The sea test uses the window's own extent, so the set of windows does
+        # not depend on how far the radial profile looks around it.
         patch = read_earth_patch(lat, lon, half_m, arcsec=ARCSEC, tile_loader=_cached_dem)
         if not np.isfinite(patch.z).any():
             continue
         sea = float(np.mean((patch.z == 0) | ~np.isfinite(patch.z)))
         if sea > MAX_SEA_FRAC:
             continue
+        try:
+            patch = read_earth_patch(lat, lon, read_half_m(window_m, scales), arcsec=ARCSEC, tile_loader=_cached_dem)
+        except ValueError:  # next to ±180°: the profile searches within the narrower patch
+            pass
         features = extract_features(patch, lat, lon, window_m, scales)
         if features.valid_frac < 0.95 or not np.isfinite(features.values["slope_mean_1km"]):
             continue
         cover = landcover.window_fractions(lat, lon, window_m, loader=_cached_cover)
-        rows.append({"lat": lat, "lon": lon, "sea_frac": sea, "valid_frac": features.valid_frac, **features.values, **cover})
+        profile = features.profile
+        rows.append(
+            {
+                "lat": lat,
+                "lon": lon,
+                "sea_frac": sea,
+                "valid_frac": features.valid_frac,
+                **features.values,
+                "prof_r2": profile.r2,
+                "prof_dx_km": profile.dx_m / 1000,
+                "prof_dy_km": profile.dy_m / 1000,
+                **cover,
+            }
+        )
     return rows
 
 
@@ -163,10 +194,14 @@ def build_catalog(
                 log(f"[features] {i}/{len(chunks)} chunks, {len(rows)} valid windows")
 
     frame = pd.DataFrame(rows).sort_values(["lat", "lon"]).reset_index(drop=True)
+    # Profile rings are in units of the window's own spread, so 0.001 is far
+    # below any meaningful difference; rounding lets the file compress well.
+    profile_columns = [c for c in frame.columns if c.startswith(PROFILE_PREFIX) or c == "prof_r2"]
+    frame[profile_columns] = frame[profile_columns].round(3)
     measurements = frame.columns.difference(["lat", "lon"])
     frame[measurements] = frame[measurements].astype("float32")
     output.parent.mkdir(parents=True, exist_ok=True)
-    frame.to_parquet(output, index=False)
+    frame.to_parquet(output, index=False, compression="zstd")
 
     metadata = {
         "created_utc": utc_now(),
@@ -181,6 +216,12 @@ def build_catalog(
         "failed_dem_tiles": failed_dem,
         "failed_cover_tiles": failed_cover,
         "feature_names": feature_names(scales_m),
+        "radial_profile": {
+            "radius_m": (round(window_m / min(scales_m)) - 1) / 2 * min(scales_m),
+            "rings": PROFILE_BINS,
+            "spacing_m": min(scales_m),
+            "max_centre_shift_m": PROFILE_SHIFT_M,
+        },
         "method": METHOD,
         "data_sources": data_sources(),
         "software": software_versions(),
