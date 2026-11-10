@@ -9,10 +9,11 @@ import pandas as pd
 from scipy import ndimage
 from scipy.interpolate import LinearNDInterpolator, NearestNDInterpolator
 
+from .bodies import EARTH
 from .catalog import ARCSEC, _cached_dem
 from .dem import Patch, read_earth_patch
-from .similarity import DEFAULT_WEIGHTS, Normalizer, feature_weights, weighted_distance
-from .terrain import DEFAULT_SCALES_M, DEFAULT_WINDOW_M, PROFILE_PREFIX, extract_features, read_half_m
+from .similarity import DEFAULT_WEIGHTS, Normalizer, feature_weights, great_circle_km, weighted_distance
+from .terrain import DEFAULT_SCALES_M, DEFAULT_WINDOW_M, PROFILE_PREFIX, aeqd_to_latlon, extract_features, read_half_m
 
 
 def resample_mask(mask: np.ndarray, shape: tuple[int, int]) -> np.ndarray:
@@ -98,6 +99,63 @@ def self_retrieval(
     changes_frame = pd.DataFrame(changes)
     summary = pd.DataFrame({"median_abs_change_pct": changes_frame.median(), "p90_abs_change_pct": changes_frame.quantile(0.9)})
     return pd.DataFrame(rows), summary
+
+
+def offset_retrieval(
+    catalog: pd.DataFrame,
+    names: list[str],
+    measured: np.ndarray,
+    weightings: dict[str, dict[str, float]],
+    *,
+    n: int = 400,
+    seed: int = 11,
+    max_offset_m: float = 10_000.0,
+    hit_km: float = 15.0,
+    window_m: float = DEFAULT_WINDOW_M,
+    scales_m=DEFAULT_SCALES_M,
+) -> pd.DataFrame:
+    """Blind search from points that are not window centres.
+
+    A real reference never sits on a catalog window centre. Each query is a
+    random point up to ``max_offset_m`` from a sampled window, rebuilt from a
+    real MOLA track pattern like in ``self_retrieval``. The query's place is
+    found if a window within ``hit_km`` of it ranks high; 15 km covers the
+    largest distance to the nearest centre on a 20 km grid (14.1 km).
+
+    Returns one row per query with ``rank_<label>`` for every weighting in
+    ``weightings``: the best rank of any window near the query. The same
+    degraded queries are ranked under every weighting.
+    """
+    rng = np.random.default_rng(seed)
+    sample = catalog.iloc[rng.choice(len(catalog), size=min(n, len(catalog)), replace=False)]
+    normalizer = Normalizer.fit(catalog, names)
+    z_all = normalizer.apply_frame(catalog)
+    weights = {label: feature_weights(names, w) for label, w in weightings.items()}
+    lat_all, lon_all = catalog["lat"].to_numpy(), catalog["lon"].to_numpy()
+    half_m = read_half_m(window_m, scales_m)
+
+    rows = []
+    for _, row in sample.iterrows():
+        radius, angle = max_offset_m * np.sqrt(rng.uniform()), rng.uniform(0, 2 * np.pi)
+        lat, lon = aeqd_to_latlon(np.array(radius * np.cos(angle)), np.array(radius * np.sin(angle)), row["lat"], row["lon"], EARTH.radius_m)
+        lat, lon = float(lat), float(lon)
+        try:
+            patch = read_earth_patch(lat, lon, half_m, arcsec=ARCSEC, tile_loader=_cached_dem)
+        except ValueError:  # next to ±180°
+            continue
+        if not np.isfinite(patch.z).all():
+            continue
+        degraded = extract_features(with_track_gaps(patch, measured), lat, lon, window_m, scales_m).values
+        if not np.isfinite(list(degraded.values())).all():
+            continue
+        near = great_circle_km(lat, lon, lat_all, lon_all) <= hit_km
+        z_query = normalizer.apply_values(degraded)
+        result = {"lat": lat, "lon": lon, "offset_km": radius / 1000}
+        for label, w in weights.items():
+            distance = weighted_distance(z_query, z_all, w)
+            result[f"rank_{label}"] = int(np.sum(distance < distance[near].min())) + 1
+        rows.append(result)
+    return pd.DataFrame(rows)
 
 
 def support_bias(fine: dict[str, float], coarse: dict[str, float]) -> pd.DataFrame:

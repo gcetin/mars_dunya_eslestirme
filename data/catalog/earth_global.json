@@ -1,5 +1,5 @@
 {
-  "created_utc": "2026-11-09T20:35:53+00:00",
+  "created_utc": "2026-11-10T19:46:31+00:00",
   "regions": [
     [
       -56.0,
@@ -24,7 +24,7 @@
   "earth_grid_arcsec": 15,
   "n_centers": 1155795,
   "n_valid_windows": 324859,
-  "n_dem_tiles": 50801,
+  "n_dem_tiles": 50811,
   "failed_dem_tiles": [],
   "failed_cover_tiles": [],
   "feature_names": [
@@ -48,9 +48,27 @@
     "hypso",
     "skew",
     "radial_r2",
-    "basin_depth"
+    "basin_depth",
+    "rprof_00",
+    "rprof_01",
+    "rprof_02",
+    "rprof_03",
+    "rprof_04",
+    "rprof_05",
+    "rprof_06",
+    "rprof_07",
+    "rprof_08",
+    "rprof_09",
+    "rprof_10",
+    "rprof_11"
   ],
-  "method": "Her gövde için aynı işlem: kaynak pikselin desteğini hesaba katan Gauss alçak geçiren filtre (sigma = ölçek × 0,5), kendi yarıçapıyla yerel azimutal eşit uzaklık ızgarasına yeniden örnekleme, ardından yalnızca metre cinsinden yerel morfoloji özellikleri. Mutlak yükseklik ve koordinat gövdeler arasında karşılaştırılmaz.",
+  "radial_profile": {
+    "radius_m": 29500.0,
+    "rings": 12,
+    "spacing_m": 1000.0,
+    "max_centre_shift_m": 15000.0
+  },
+  "method": "Her gövde için aynı işlem: kaynak pikselin desteğini hesaba katan Gauss alçak geçiren filtre (sigma = ölçek × 0,5), kendi yarıçapıyla yerel azimutal eşit uzaklık ızgarasına yeniden örnekleme, ardından yalnızca metre cinsinden yerel morfoloji özellikleri. Radyal profil, pencere merkezinin 15 km çevresinde en simetrik merkez aranarak 12 halkada hesaplanır ve penceredeki yükseklik oynaklığına bölünür. Mutlak yükseklik ve koordinat gövdeler arasında karşılaştırılmaz.",
   "data_sources": {
     "mars_dem": "MGS MOLA MEGDR 128 ppd (USGS global mosaic) — https://planetarymaps.usgs.gov/mosaic/Mars_MGS_MOLA_DEM_mosaic_global_463m.tif",
     "moon_dem": "LRO LOLA LDEM 256 ppd (USGS global mosaic, Mar 2014) — https://planetarymaps.usgs.gov/mosaic/Lunar_LRO_LOLA_Global_LDEM_118m_Mar2014.tif",
@@ -66,6 +84,6 @@
     "pandas": "3.1.1",
     "rasterio": "1.5.2"
   },
-  "seconds_fetch": 28,
-  "seconds_features": 276
+  "seconds_fetch": 3,
+  "seconds_features": 853
 }

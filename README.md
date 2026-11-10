@@ -51,7 +51,7 @@ Bu bölümdeki diğer komutlar da Windows'ta aynıdır; yalnızca `.venv/bin/` y
 
 Hazır küresel katalog `data/catalog/earth_global.parquet` dosyasındadır, panel doğrudan onu kullanır. Bilimsel analiz [notebooks/01_jezero_salda.ipynb](notebooks/01_jezero_salda.ipynb) içindedir; `.venv` çekirdeğiyle açın.
 
-Kataloğu yeniden üretmek için (hesap gerekmez; yaklaşık 45 dakika, 1,1 GB önbellek):
+Kataloğu yeniden üretmek için (hesap gerekmez; sıfırdan yaklaşık bir saat, 1,1 GB önbellek; önbellek doluysa 15 dakika):
 
 ```bash
 .venv/bin/python scripts/build_catalog.py --global --output data/catalog/earth_global.parquet
@@ -63,13 +63,17 @@ Kataloğu yeniden üretmek için (hesap gerekmez; yaklaşık 45 dakika, 1,1 GB �
 
 | Soru | Sonuç |
 |---|---|
-| Salda, Jezero'ya topografik olarak benziyor mu? | Hayır. Dünya pencerelerinin yalnızca %11,6'sından daha yakın. Salda'nın analogluğu mineralojiktir. |
+| Salda, Jezero'ya topografik olarak benziyor mu? | Hayır. Dünya pencerelerinin yalnızca %9,8'inden daha yakın. Salda'nın analogluğu mineralojiktir. |
 | Jezero'nun Dünya'daki en yakın eşi | Çin'in Sincan bölgesinde kapalı bir havza (43,47°K, 91,62°D). İlk 10 adayın 4'ü Atacama/Puna'da. |
-| Katalog | 324.859 pencere (60 km, 20 km adım); 48.763'ü çıplak zemin filtresinden geçiyor. |
+| Katalog | 324.859 pencere (60 km, 20 km adım), pencere başına 33 özellik; 48.763'ü çıplak zemin filtresinden geçiyor. |
 | MOLA veri desteği | Jezero penceresindeki hücrelerin %32,9'unda gerçek lazer ölçümü var. |
-| Kör arama (399 pencere, gerçek MOLA iziyle bozulmuş) | %85,7 ilk sırada, %95,7 ilk 10'da. |
+| Kör arama, sorgu pencere merkezinde (396 pencere, gerçek MOLA iziyle bozulmuş) | %88,6 ilk sırada, %91,4 ilk 10'da. Radyal profil olmadan %84,8 ve %95,7. |
+| Kör arama, sorgu 10 km'ye kadar kaymış (398 nokta) | %20,1 ilk sırada, %33,9 ilk 10'da. Radyal profil olmadan %9,3 ve %23,6. |
+| Krater biçimi (Tooting, Mars, 29 km; yalnızca radyal profil) | İlk aday Kanada'daki Mistastin çarpma krateri (28 km). |
 
-Adaylar dairesel krater değil, kapalı havzalardır. Metrikler dönmeden bağımsız özet istatistikler olduğu için yöntem "kenarları yüksek, tabanı düz havza" biçimini bulur. Kör arama yöntemin üst sınırını gösterir, gezegenler arası geçerliliği kanıtlamaz.
+Jezero'nun adayları dairesel krater değil, kapalı havzalardır. Jezero'nun kenarı aşınmış ve 60 km'lik pencerede dışarı doğru alçalmadığı için radyal profili de böyle bir havzanınkine benziyor; profil eklendikten sonra liste değişmedi. Kenarı belirgin genç kraterlerde ise profil gerçek kraterleri bulabiliyor (Tooting → Mistastin).
+
+Kaymış sorgu deneyi daha gerçekçidir, çünkü bir Mars bölgesi hiçbir Dünya pencere merkezine denk gelmez. Pencere merkezindeki kör arama yöntemin başarısını olduğundan yüksek gösterir. Radyal profil kaymış sorguda isabeti iki katına çıkarıyor, pencere merkezindeki sorguda ise ilk 10 oranını biraz düşürüyor. Her iki deney de sorgu ve katalog aynı gezegenden geldiği için bir üst sınırdır, gezegenler arası geçerliliği kanıtlamaz.
 
 ## Yöntem
 
@@ -77,8 +81,8 @@ Her gövde için aynı adımlar uygulanır:
 
 1. **Destek eşleme.** DEM, kaynak pikselin sahip olduğu desteği hesaba katan bir Gauss filtresiyle analiz ölçeğine indirilir. Böylece 30 m ve 463 m kaynaklar aynı fiziksel desteğe gelir.
 2. **Yerel metrik ızgara.** Pencere, gövdenin kendi yarıçapıyla azimutal eşit uzaklık ızgarasına örneklenir. Gövdeler arasında mutlak yükseklik ve koordinat karşılaştırılmaz.
-3. **Özellikler.** 1, 2 ve 4 km ölçeklerinde eğim istatistikleri, TRI ve pürüzlülük; pencere düzeyinde rölyef, hipsometrik integral, çarpıklık, dairesel simetri ve havza derinliği.
-4. **Sıralama.** Özellikler Dünya pencerelerinin dağılımına göre ölçeklenir ve dört aile (eğim, engebelilik, rölyef, biçim) ağırlıklandırılır. MOLA iz deseni deneyi 1 km özelliklerini en çok etkilediği için bu ölçek yarım ağırlıkla sayılır.
+3. **Özellikler.** 1, 2 ve 4 km ölçeklerinde eğim istatistikleri, TRI ve pürüzlülük; pencere düzeyinde rölyef, hipsometrik integral, çarpıklık, dairesel simetri ve havza derinliği. Ayrıca 12 halkalık bir radyal profil: merkezi pencere merkezinin 15 km çevresinde en simetrik nokta olarak aranır ve yükseklik oynaklığına bölünerek birimsiz yazılır, böylece yerçekimine bağlı krater derinliği karşılaştırmaya girmez.
+4. **Sıralama.** Özellikler Dünya pencerelerinin dağılımına göre ölçeklenir ve beş aile ağırlıklandırılır: eğim 0,25, engebelilik 0,20, rölyef 0,15, biçim 0,20, radyal profil 0,20. MOLA iz deseni deneyi 1 km özelliklerini en çok etkilediği için bu ölçek yarım ağırlıkla sayılır.
 5. **Eleme ve yüzey.** WorldCover ile bitki örtüsü, tarım, su ve yerleşim elenir. Seçilen adaylar Sentinel-2 ile incelenir.
 6. **Açıklama.** Her aday için özellik bazında fark katkısı, ağırlık değişimine kararlılık ve Dünya pencereleri içindeki yüzdelik verilir.
 
@@ -107,17 +111,17 @@ Her gövde için aynı adımlar uygulanır:
 src/analog_finder/
   bodies.py        Gövdeler ve DEM ürünleri
   dem.py           Uzak DEM okuma, karo birleştirme, önbellek
-  terrain.py       Destek eşleme ve morfoloji özellikleri
+  terrain.py       Destek eşleme, morfoloji özellikleri, radyal profil
   similarity.py    Sıralama, açıklama, kararlılık
   catalog.py       Küresel Dünya kataloğu
   landcover.py     WorldCover payları
   surface.py       Sentinel-2 göstergeleri
   mola_support.py  MOLA gerçek ölçüm yoğunluğu
-  validation.py    Kör arama ve yanlılık deneyleri
+  validation.py    Kör arama (pencere merkezinde ve kaymış), yanlılık deneyleri
   provenance.py    Yöntem, sürüm ve kaynak kayıtları
 app/               Streamlit paneli
 notebooks/         Jezero–Salda analizi
-scripts/           Katalog üretimi
+scripts/           Katalog üretimi, belge şekilleri
 tests/             Analitik ve veri katmanı testleri
 ```
 
@@ -125,13 +129,13 @@ tests/             Analitik ve veri katmanı testleri
 
 - Benzerlik puanı olasılık değildir ve jeoloji veya mineraloji içermez.
 - MOLA, 1 km'den küçük yapıları güvenilir biçimde temsil etmez. Jezero deltası gibi birkaç km'lik yapılar için HRSC gerekir.
-- Pencereler 20 km adımla kayar; bir yapının merkezi 14 km'ye kadar kaçabilir.
+- Pencereler 20 km adımla kayar; bir yapının merkezi 14 km'ye kadar kaçabilir. Radyal profil merkezini aradığı için bundan etkilenmez, diğer özellikler etkilenir.
+- Pencere boyu tektir (60 km); çok küçük veya büyük yapılar bu ölçeğe sığmaz.
 - Mars ve Ay'da yerçekimi, atmosfer ve aşınma farklıdır. Benzer biçimler farklı süreçlerden doğmuş olabilir.
 - 80°'den yüksek enlemlerde Mars ve Ay için kutupsal ürünler henüz entegre değildir.
 
 ## Sonraki adımlar
 
-1. Radyal profili doğrudan karşılaştıran, krater biçimine duyarlı bir özellik.
-2. Birden çok pencere boyutu (ör. 15, 30, 120 km).
-3. USGS Ay jeoloji haritası ile jeolojik bağlam.
-4. Seçilmiş Mars bölgeleri için HRSC, ardından CRISM/OMEGA ile mineraloji.
+1. Birden çok pencere boyutu (ör. 15, 30, 120 km) ve konum kaymasına daha dayanıklı arama.
+2. USGS Ay jeoloji haritası ile jeolojik bağlam.
+3. Seçilmiş Mars bölgeleri için HRSC, ardından CRISM/OMEGA ile mineraloji.

@@ -23,15 +23,15 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap, ListedColormap
-from matplotlib.patches import Rectangle
-from matplotlib.ticker import FuncFormatter
+from matplotlib.patches import Circle, Rectangle
+from matplotlib.ticker import FuncFormatter, ScalarFormatter
 
 from analog_finder.bodies import EARTH, MARS
 from analog_finder.catalog import CATALOG_DIR, load_catalog
 from analog_finder.dem import read_earth_patch, read_global_patch
 from analog_finder.mola_support import shot_counts, shot_coverage
 from analog_finder.query import window_features
-from analog_finder.similarity import Filters, explain, rank_candidates
+from analog_finder.similarity import DEFAULT_WEIGHTS, Filters, explain, rank_candidates
 from analog_finder.surface import surface_for_window
 from analog_finder.terrain import (
     DEFAULT_SCALES_M,
@@ -39,17 +39,18 @@ from analog_finder.terrain import (
     extract_features,
     hillshade,
     hypsometric_curve,
-    margin_m,
     radial_profile,
+    read_half_m,
     slope_cdf,
     slope_deg,
 )
 
 OUT = ROOT / "docs" / "img"
 WINDOW = 60_000.0
-HALF = WINDOW / 2 + margin_m(DEFAULT_SCALES_M)
+HALF = read_half_m(WINDOW, DEFAULT_SCALES_M)
 JEZERO = (18.38, 77.58)
 SALDA = (37.55, 29.68)
+TOOTING = (23.17, -152.2)
 
 # Reference palette, light and dark steps of the same hues.
 RAMP = ["#cde2fb", "#b7d3f6", "#9ec5f4", "#86b6ef", "#6da7ec", "#5598e7", "#3987e5", "#2a78d6", "#256abf", "#1c5cab", "#184f95", "#104281", "#0d366b"]
@@ -57,12 +58,12 @@ THEMES = {
     "light": {
         "surface": "#fcfcfb", "ink": "#0b0b0b", "ink2": "#52514e", "muted": "#898781",
         "grid": "#e1e0d9", "axis": "#c3c2b7", "earth": "#2a78d6", "reference": "#eb6834",
-        "neutral": "#c3c2b7", "off": "#ecebe6", "ramp": RAMP,
+        "neutral": "#c3c2b7", "off": "#ecebe6", "old": "#898781", "ramp": RAMP,
     },
     "dark": {
         "surface": "#1a1a19", "ink": "#f0efec", "ink2": "#c3c2b7", "muted": "#898781",
         "grid": "#2c2c2a", "axis": "#383835", "earth": "#3987e5", "reference": "#d95926",
-        "neutral": "#4a4a46", "off": "#262624", "ramp": RAMP[::-1],
+        "neutral": "#4a4a46", "off": "#262624", "old": "#898781", "ramp": RAMP[::-1],
     },
 }
 
@@ -96,9 +97,11 @@ def style(t: dict) -> None:
 
 
 def save(fig, name: str, theme: str) -> None:
+    # Only numeric axes; a category axis keeps its labels.
     for ax in fig.axes:
-        ax.xaxis.set_major_formatter(TICKS)
-        ax.yaxis.set_major_formatter(TICKS)
+        for axis in (ax.xaxis, ax.yaxis):
+            if isinstance(axis.get_major_formatter(), ScalarFormatter):
+                axis.set_major_formatter(TICKS)
     suffix = "" if theme == "light" else "-dark"
     fig.savefig(OUT / f"{name}{suffix}.png", bbox_inches="tight", pad_inches=0.15)
     plt.close(fig)
@@ -152,6 +155,18 @@ def main() -> None:
     coverage = shot_coverage(*JEZERO, WINDOW)
     surface = surface_for_window(float(best["lat"]), float(best["lon"]), WINDOW)
 
+    # Jezero seen from a window 10 km east of the crater centre.
+    east_deg = 10_000 / (MARS.radius_m * math.radians(1) * math.cos(math.radians(JEZERO[0])))
+    shifted_at = (JEZERO[0], JEZERO[1] + east_deg)
+    shifted = extract_features(read_global_patch(MARS, *shifted_at, HALF), *shifted_at)
+    fixed_r, fixed_p, fixed_r2 = radial_profile(shifted.grids[1000.0], 1000.0)
+    # Fixed-centre profile in the same units as the searched one.
+    fixed_p = fixed_p / np.std(shifted.grids[1000.0] - np.mean(shifted.grids[1000.0]))
+    tooting, _ = window_features(MARS, *TOOTING)
+    only_profile = dict.fromkeys(DEFAULT_WEIGHTS, 0.0) | {"profile": 1.0}
+    crater_match = rank_candidates(tooting.values, catalog, names, family_weights=only_profile, top_n=3, stability_draws=50).table.iloc[0]
+    crater_feats, _ = window_features(EARTH, float(crater_match["lat"]), float(crater_match["lon"]))
+
     raw_j, raw_s = raw_slope(jezero_patch, JEZERO[0]), raw_slope(salda_patch, SALDA[0])
     slope_j, slope_s = slope_deg(jezero.grids[1000.0], 1000.0)[1:-1, 1:-1], slope_deg(salda.grids[1000.0], 1000.0)[1:-1, 1:-1]
     extent = [-30, 30, -30, 30]
@@ -200,18 +215,42 @@ def main() -> None:
             ax.plot(*a, color=t["reference"], label="Jezero (Mars)")
             ax.plot(*b, color=t["earth"], label="Salda (Dünya)")
             ax.set_xlabel(xlabel); ax.set_ylabel(ylabel); ax.set_title(title)
-        rj, pj, r2j = radial_profile(g_j, 1000.0)
-        rs, ps, r2s = radial_profile(g_s, 1000.0)
+        pj, ps = jezero.profile, salda.profile
         ax = axes[2]
-        ax.plot(rj / 1000, pj, color=t["reference"], label="Jezero (Mars)")
-        ax.plot(rs / 1000, ps, color=t["earth"], label="Salda (Dünya)")
-        end_label(ax, rj / 1000, pj, f"Jezero\nR² {num(r2j, 2)}", t)
-        end_label(ax, rs / 1000, ps, f"Salda\nR² {num(r2s, 2)}", t)
+        ax.plot(pj.radius_m / 1000, pj.shape, color=t["reference"], label="Jezero (Mars)")
+        ax.plot(ps.radius_m / 1000, ps.shape, color=t["earth"], label="Salda (Dünya)")
+        end_label(ax, pj.radius_m / 1000, pj.shape, f"Jezero\nR² {num(pj.r2, 2)}", t)
+        end_label(ax, ps.radius_m / 1000, ps.shape, f"Salda\nR² {num(ps.r2, 2)}", t)
         ax.set_xlim(0, 36)
-        ax.set_xlabel("Pencere merkezinden uzaklık (km)"); ax.set_ylabel("Halka ortalaması (m)"); ax.set_title("Radyal profil")
+        ax.set_xlabel("Profil merkezinden uzaklık (km)"); ax.set_ylabel("Halka ortalaması (σ)"); ax.set_title("Radyal profil")
         handles, labels = axes[0].get_legend_handles_labels()
         fig.legend(handles, labels, loc="upper center", ncol=2, bbox_to_anchor=(0.5, 1.06))
         fig.tight_layout(); save(fig, "ozellikler", theme)
+
+        # 4b. The searched centre and what it buys.
+        fig, axes = plt.subplots(1, 3, figsize=(13.5, 4.1), gridspec_kw={"width_ratios": [1, 1.25, 1.25]})
+        ax = axes[0]
+        ax.imshow(hillshade(shifted.grids[1000.0], 1000.0), **SHADE, extent=extent)
+        found = shifted.profile
+        ax.plot(0, 0, marker="+", markersize=14, markeredgewidth=2.5, color=t["ink"])
+        ax.add_patch(Circle((found.dx_m / 1000, found.dy_m / 1000), 29.5, fill=False, edgecolor=t["reference"], linewidth=2))
+        ax.plot(found.dx_m / 1000, found.dy_m / 1000, marker="x", markersize=9, markeredgewidth=2, color=t["reference"])
+        ax.set_xlim(-30, 30); ax.set_ylim(-30, 30)
+        ax.set_title("Pencere kraterden 10 km doğuda\n+ pencere merkezi · × profil merkezi"); km_axes(ax)
+        ax = axes[1]
+        ax.plot(jezero.profile.radius_m / 1000, jezero.profile.shape, color=t["reference"], label="Krater merkezli pencere")
+        ax.plot(found.radius_m / 1000, found.shape, color=t["earth"], linestyle=(0, (4, 2)), label="Kaymış pencere, merkez aranarak")
+        ax.plot(fixed_r / 1000, fixed_p, color=t["old"], label="Kaymış pencere, sabit merkez")
+        ax.set_xlabel("Profil merkezinden uzaklık (km)"); ax.set_ylabel("Halka ortalaması (σ)")
+        ax.set_title(f"Jezero'nun profili (R²: {num(jezero.profile.r2, 2)} · {num(found.r2, 2)} · {num(fixed_r2, 2)})")
+        ax.legend(loc="upper left", fontsize=8.5)
+        ax = axes[2]
+        ax.plot(tooting.profile.radius_m / 1000, tooting.profile.shape, color=t["reference"], label="Tooting (Mars, 29 km)")
+        ax.plot(crater_feats.profile.radius_m / 1000, crater_feats.profile.shape, color=t["earth"], label="En yakın Dünya profili: Mistastin")
+        ax.set_xlabel("Profil merkezinden uzaklık (km)"); ax.set_ylabel("Halka ortalaması (σ)")
+        ax.set_title("Kenarı yükseltilmiş krater")
+        ax.legend(loc="lower right", fontsize=8.5)
+        fig.tight_layout(); save(fig, "radyal-profil", theme)
 
         # 5. Where the catalog windows are.
         fig, ax = plt.subplots(figsize=(12, 5.6))
@@ -297,13 +336,18 @@ def main() -> None:
         print(f"  {name}: Jezero {jezero.values[name]:.3f}, Salda {salda.values[name]:.3f}")
     print("== Sıralama örneği")
     print(f"  en yakın aday {best['lat']:.3f}, {best['lon']:.3f}: mesafe {best['distance']:.3f}, benzerlik {best['score']:.1f}, yüzdelik {best['percentile']:.4f}, kararlılık {best['stability']:.2f}")
-    print(f"  aile uyumu: " + ", ".join(f"{f} {100 * math.exp(-best[f'd_{f}']):.0f}" for f in ('slope', 'ruggedness', 'relief', 'shape')))
+    print(f"  aile uyumu: " + ", ".join(f"{f} {100 * math.exp(-best[f'd_{f}']):.0f}" for f in ('slope', 'ruggedness', 'relief', 'shape', 'profile')))
     print(f"  Salda: mesafe {salda_distance:.3f}, yüzdelik {salda_percentile:.1f}")
     print(f"  filtreden geçen {ranked.n_after_filter} / {ranked.n_scanned}")
     weights = dict(zip(ranked.names, ranked.weights))
     for _, row in why.head(4).iterrows():
         print(f"  {row['feature']}: Jezero {row['reference']:.3f}, aday {row['candidate']:.3f}, z farkı {row['z_diff']:+.2f}, ağırlık {weights[row['feature']]:.4f}, katkı %{row['contribution'] * 100:.1f}")
     print(f"  MOLA ölçümlü hücre payı: %{coverage.measured_frac * 100:.1f}")
+    print("== Radyal profil")
+    print(f"  Jezero: R² {jezero.profile.r2:.2f}, merkez kayması ({jezero.profile.dx_m / 1000:+.0f}, {jezero.profile.dy_m / 1000:+.0f}) km")
+    print(f"  10 km kaymış pencere: bulunan kayma ({shifted.profile.dx_m / 1000:+.0f}, {shifted.profile.dy_m / 1000:+.0f}) km, R² {shifted.profile.r2:.2f}; sabit merkezde R² {fixed_r2:.2f}")
+    print(f"  Tooting R² {tooting.profile.r2:.2f}; yalnızca profille en yakın: {crater_match['lat']:.2f}, {crater_match['lon']:.2f} (R² {crater_match['prof_r2']:.2f})")
+    print(f"  Jezero profil halkaları: {np.round(jezero.profile.shape, 2)}")
 
 
 if __name__ == "__main__":

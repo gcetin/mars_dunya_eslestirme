@@ -11,7 +11,7 @@ import pandas as pd
 from .terrain import DEFAULT_WINDOW_M, PROFILE_BINS, PROFILE_PREFIX
 
 FAMILIES = {"slope": "Eğim", "ruggedness": "Engebelilik", "relief": "Rölyef", "shape": "Biçim", "profile": "Radyal profil"}
-DEFAULT_WEIGHTS = {"slope": 0.30, "ruggedness": 0.25, "relief": 0.15, "shape": 0.30, "profile": 0.0}
+DEFAULT_WEIGHTS = {"slope": 0.25, "ruggedness": 0.20, "relief": 0.15, "shape": 0.20, "profile": 0.20}
 
 # Relative weight of a feature within its family, by analysis scale. Rebuilding
 # Earth DEMs from real MOLA track patterns changes 1 km features by 8-17 %, but
