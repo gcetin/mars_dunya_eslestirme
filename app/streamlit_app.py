@@ -5,11 +5,14 @@ Run with:  streamlit run app/streamlit_app.py
 
 from __future__ import annotations
 
+import hashlib
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "src"))
+SRC = ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
 
 import folium
 import numpy as np
@@ -17,6 +20,30 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 from streamlit_folium import st_folium
+
+
+def _package_fingerprint() -> str:
+    digest = hashlib.sha1()
+    for path in sorted((SRC / "analog_finder").glob("*.py")):
+        digest.update(path.name.encode())
+        digest.update(path.read_bytes())
+    return digest.hexdigest()
+
+
+# After a code update Streamlit reruns this script but reloads only modules
+# next to it. The analysis package lives in src/, so an old copy would stay in
+# memory: drop it, and every result cached with it, when its source changed.
+_fingerprint = _package_fingerprint()
+_loaded = sys.modules.get("analog_finder")
+if _loaded is not None and getattr(_loaded, "source_fingerprint", None) != _fingerprint:
+    for _name in [m for m in sys.modules if m == "analog_finder" or m.startswith("analog_finder.")]:
+        del sys.modules[_name]
+    st.cache_data.clear()
+    st.cache_resource.clear()
+
+import analog_finder
+
+analog_finder.source_fingerprint = _fingerprint
 
 from analog_finder.bodies import BODIES, EARTH
 from analog_finder.catalog import CATALOG_DIR, load_catalog
