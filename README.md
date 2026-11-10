@@ -4,6 +4,8 @@ NASA Space Apps Challenge projesi. Mars veya Ay üzerinde seçilen bir bölgeye 
 
 Benzer görünen iki uydu görüntüsü bilimsel olarak benzer iki yüzey anlamına gelmez. Bu yüzden sistem görüntüleri değil, metre cinsinden hesaplanan ve fiziksel olarak yorumlanabilen morfoloji özelliklerini karşılaştırır.
 
+**Canlı uygulama:** https://mars-dunya-eslestirme.streamlit.app
+
 Yazılımın baştan sona nasıl çalıştığı, hangi veriyi ne için kullandığı, hesapların ayrıntısı ve uygulamanın kullanımı [docs/nasil-calisir.md](docs/nasil-calisir.md) dosyasında anlatılır.
 
 ## Hızlı başlangıç

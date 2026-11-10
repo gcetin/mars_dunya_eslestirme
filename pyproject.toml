@@ -15,7 +15,6 @@ dependencies = [
     "rasterio",
     "matplotlib",
     "requests",
-    "pystac-client",
     "streamlit",
     "folium",
     "streamlit-folium",

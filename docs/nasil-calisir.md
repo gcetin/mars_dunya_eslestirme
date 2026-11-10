@@ -320,7 +320,7 @@ Literatürde geçen 15 Dünya analogu, neyin analoğu oldukları notuyla birlikt
 
 ## 8. Uygulamayı kullanma
 
-Canlı sürüm Streamlit Community Cloud'da çalışır. Yerelde `streamlit run app/streamlit_app.py` ile açılır (kurulum için README'ye bakın). Bir alan ilk kez seçildiğinde DEM okunurken bir dakikaya kadar beklemek gerekebilir; sonraki açılışlar önbellekten gelir.
+Canlı sürüm Streamlit Community Cloud'da çalışır: https://mars-dunya-eslestirme.streamlit.app. `main` dalına yapılan her push birkaç dakika içinde oraya yansır. Yerelde `streamlit run app/streamlit_app.py` ile açılır (kurulum için README'ye bakın). Bir alan ilk kez seçildiğinde DEM okunurken bir dakikaya kadar beklemek gerekebilir; sonraki açılışlar önbellekten gelir.
 
 ![Uygulamanın üst bölümü: kenar çubuğu, Jezero'nun geniş görünümü ve uyarılar](img/uygulama-ust.jpg)
 
