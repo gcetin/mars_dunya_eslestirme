@@ -141,3 +141,18 @@ tests/             Analitik ve veri katmanı testleri
 1. Birden çok pencere boyutu (ör. 15, 30, 120 km) ve konum kaymasına daha dayanıklı arama.
 2. USGS Ay jeoloji haritası ile jeolojik bağlam.
 3. Seçilmiş Mars bölgeleri için HRSC, ardından CRISM/OMEGA ile mineraloji.
+
+## Lisans
+
+Kod [MIT lisansıyla](LICENSE) yayımlanır. Lisans yalnızca kodu kapsar: `data/catalog/` altındaki katalog ve `docs/img/` altındaki şekiller aşağıdaki verilerden türetilmiştir ve o verilerin kullanım koşullarına tabidir.
+
+## Veri atıfları
+
+- **NASADEM:** NASA JPL (2020). NASADEM Merged DEM Global 1 arc second V001. NASA EOSDIS Land Processes DAAC. doi:10.5067/MEaSUREs/NASADEM/NASADEM_HGT.001. Microsoft Planetary Computer üzerinden okunur.
+- **Copernicus DEM GLO-90:** "© DLR e.V. 2010–2014 and © Airbus Defence and Space GmbH 2014–2018 provided under COPERNICUS by the European Union and ESA; all rights reserved." AWS Open Data üzerinden okunur.
+- **ESA WorldCover 2021 v200:** "© ESA WorldCover project 2021 / Contains modified Copernicus Sentinel data (2021) processed by ESA WorldCover consortium." CC BY 4.0. Zanaga, D. ve diğ. (2022), doi:10.5281/zenodo.7254221.
+- **Sentinel-2 L2A:** "Contains modified Copernicus Sentinel data (2025)." Element 84 Earth Search ve AWS Open Data üzerinden okunur.
+- **MGS MOLA MEGDR:** Smith, D. E. ve diğ. (2001), JGR 106(E10). USGS Astrogeology global mozaiği; ölçüm sayıları NASA PDS Geosciences Node'dan.
+- **LRO LOLA LDEM:** Smith, D. E. ve diğ. (2010), GRL 37. USGS Astrogeology global mozaiği.
+- **NASA Solar System Treks:** Mars ve Ay geniş görünüm katmanları, yalnızca görsel bağlam için.
+- **Uygulamadaki Dünya haritası:** © OpenStreetMap katkıcıları (ODbL); Esri World Imagery (Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP ve GIS User Community).

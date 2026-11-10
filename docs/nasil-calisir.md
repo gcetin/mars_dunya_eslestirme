@@ -78,7 +78,7 @@ Belgenin geri kalanında her adımı aynı örnekle izliyoruz: **Jezero Krateri 
 
 Bu kaynakların hiçbiri hesap gerektirmez. Dosyalar Cloud Optimized GeoTIFF biçimindedir ve HTTP aralık istekleriyle okunur, yani yalnızca istenen bölgenin baytları indirilir. İndirilen her şey `data/cache/` altında saklanır. Bu klasör git'e girmez; küresel katalog için yaklaşık 1,1 GB tutar ve istenildiğinde silinebilir. Konumu `ANALOG_CACHE` ortam değişkeniyle değiştirilebilir.
 
-Yükseklik verilerinin Mars ve Ay tarafı NASA görevlerinden gelir. Dünya tarafının büyük kısmı ise Avrupa'nın Copernicus programına aittir (Copernicus DEM, WorldCover, Sentinel-2).
+Yükseklik verilerinin Mars ve Ay tarafı NASA görevlerinden gelir. Dünya tarafının büyük kısmı ise Avrupa'nın Copernicus programına aittir (Copernicus DEM, WorldCover, Sentinel-2). Her kaynağın istediği atıf README'nin "Veri atıfları" bölümündedir. Kod MIT lisanslıdır; katalog ve şekiller bu verilerden türetildiği için onların koşullarına tabidir.
 
 ## 4. Bir pencerenin işlenmesi
 
@@ -285,7 +285,7 @@ Yalnızca kullanıcı seçili aday için düğmeye bastığında çalışır.
   <img src="img/sentinel2.png" alt="En yakın adayın Sentinel-2 gerçek renkli görüntüsü" width="60%">
 </picture>
 
-*Şekil 10. Jezero'nun en yakın adayı Sentinel-2'de. Medyan NDVI 0,05, yani bitki örtüsü yok denecek kadar az. Açık renkli düz bir tabana inen yelpaze ve kanal izleri görülüyor; bu görsel bir yorumdur, saha verisiyle doğrulanmamıştır. Sağdaki ve alttaki siyah alan, sahnenin pencereyi kapsamadığı kısım: seçilen sahne bir MGRS karosunun kenarında kalıyor.*
+*Şekil 10. Jezero'nun en yakın adayı Sentinel-2'de. Medyan NDVI 0,05, yani bitki örtüsü yok denecek kadar az. Açık renkli düz bir tabana inen yelpaze ve kanal izleri görülüyor; bu görsel bir yorumdur, saha verisiyle doğrulanmamıştır. Sağdaki ve alttaki siyah alan, sahnenin pencereyi kapsamadığı kısım: seçilen sahne bir MGRS karosunun kenarında kalıyor. Copernicus Sentinel verisi (2025) içerir.*
 
 ### 7.2 MOLA veri desteği (`mola_support.py`)
 
