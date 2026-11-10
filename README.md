@@ -6,6 +6,10 @@ Benzer görünen iki uydu görüntüsü bilimsel olarak benzer iki yüzey anlam�
 
 ## Hızlı başlangıç
 
+Python 3.11 veya üstü gerekir; panel 3.13 ile test edilmiştir.
+
+### macOS ve Linux
+
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -e ".[dev]"
@@ -18,6 +22,30 @@ python3 -m venv .venv
 # Gerçek uzak verilerle testler
 .venv/bin/python -m pytest -m network
 ```
+
+### Windows
+
+PowerShell'de:
+
+```powershell
+# Python ve Git yoksa
+winget install Python.Python.3.13 Git.Git
+
+git clone https://github.com/gcetin/mars_dunya_eslestirme.git
+cd mars_dunya_eslestirme
+py -3.13 -m venv .venv
+.venv\Scripts\python -m pip install -e ".[dev]"
+
+# Etkileşimli panel
+.venv\Scripts\streamlit run app\streamlit_app.py
+
+# Testler (ağ gerektirmez)
+.venv\Scripts\python -m pytest
+```
+
+Bu bölümdeki diğer komutlar da Windows'ta aynıdır; yalnızca `.venv/bin/` yerine `.venv\Scripts\` yazılır. Satır sonlarının gereksiz fark üretmemesi için bir kez `git config --global core.autocrlf true` çalıştırın. WSL2 kullanıyorsanız macOS ve Linux komutları olduğu gibi çalışır. Windows kurulumu henüz gerçek bir makinede denenmedi; sorun çıkarsa bildirin.
+
+### Veri ve katalog
 
 Hazır küresel katalog `data/catalog/earth_global.parquet` dosyasındadır, panel doğrudan onu kullanır. Bilimsel analiz [notebooks/01_jezero_salda.ipynb](notebooks/01_jezero_salda.ipynb) içindedir; `.venv` çekirdeğiyle açın.
 
