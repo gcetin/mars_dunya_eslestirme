@@ -443,7 +443,7 @@ Başlıca kütüphaneler: numpy ve scipy (filtreler, enterpolasyon), pandas ve p
 
 ## 11. Geliştirme
 
-- **Dal düzeni:** `main` dalı canlı uygulamadır. Streamlit Community Cloud her push'ta uygulamayı yeniden kurar. Yeni işler ayrı bir dalda yapılır ve hazır olunca `main`'e birleştirilir.
+- **Dal düzeni:** `main` dalı canlı uygulamadır. Streamlit Community Cloud her push'ta uygulamayı yeniden kurar. `main` korumalıdır: yeni işler ayrı bir dalda yapılır ve pull request ile birleştirilir. Adım adım akış ve PR öncesi kontrol listesi [CONTRIBUTING.md](../CONTRIBUTING.md) dosyasındadır.
 - **Bağımlılıklar:** Yeni bir paket hem `pyproject.toml` dosyasına hem de sürümü sabitlenmiş olarak `requirements.txt` dosyasına eklenir. Streamlit Cloud ikincisini kullanır.
 - **Yeni bir özellik eklemek:**
   1. Hesabı `terrain.py` dosyasına yazın ve adını `PER_SCALE_FEATURES` ya da `WINDOW_FEATURES` listesine ekleyin. Pencereden daha geniş bir alana bakıyorsa `read_half_m` okuma alanını da büyütün.
