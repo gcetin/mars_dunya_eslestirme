@@ -6,7 +6,7 @@ Benzer görünen iki uydu görüntüsü bilimsel olarak benzer iki yüzey anlam�
 
 **Canlı uygulama:** https://mars-dunya-eslestirme.streamlit.app
 
-Yazılımın baştan sona nasıl çalıştığı, hangi veriyi ne için kullandığı, hesapların ayrıntısı ve uygulamanın kullanımı [docs/nasil-calisir.md](docs/nasil-calisir.md) dosyasında anlatılır.
+Yazılımın baştan sona nasıl çalıştığı, hangi veriyi ne için kullandığı, hesapların ayrıntısı ve uygulamanın kullanımı [docs/nasil-calisir.md](docs/nasil-calisir.md) dosyasında anlatılır. Katkı vermek için [CONTRIBUTING.md](CONTRIBUTING.md) dosyasına bakın.
 
 ## Hızlı başlangıç
 
