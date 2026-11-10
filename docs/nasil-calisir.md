@@ -25,6 +25,13 @@ Mars veya Ay üzerinde seçilen 60 km × 60 km'lik bir bölgeye **arazi biçimi 
 
 Temel fikir şu: iki uydu görüntüsünün birbirine benzemesi, iki yüzeyin bilimsel olarak benzer olduğu anlamına gelmez. Güneş açısı, renk, çözünürlük ve atmosfer görüntüyü değiştirir. Bu yüzden görüntüleri değil, yükseklik modellerinden (DEM) metre cinsinden hesaplanan ve fiziksel anlamı olan biçim ölçülerini karşılaştırıyoruz: eğim, engebelilik, rölyef ve havza biçimi gibi.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="img/jezero-salda-dark.png">
+  <img src="img/jezero-salda.png" alt="Jezero Krateri ve Salda Gölü'nün aynı ölçekte gölgelendirilmiş rölyefi" width="100%">
+</picture>
+
+*Şekil 1. Projenin çıkış noktası olan iki bölge, 60 km × 60 km ve aynı 1 km destekle. Jezero, Perseverance'ın indiği 45 km'lik krater. Salda Gölü karbonat mineralleri nedeniyle Jezero'nun bilinen analoğu, ama biçimleri farklı. Sistemin Salda için verdiği sonuç da bu: Salda, Dünya pencerelerinin yalnızca %11,6'sından daha yakın.*
+
 Her adımda üç kural geçerlidir:
 
 - **Mutlak yükseklik ve koordinat gövdeler arasında karşılaştırılmaz.** Mars'ın sıfır yüksekliği ile Dünya'nın deniz seviyesi aynı şey değildir.
@@ -52,6 +59,8 @@ flowchart TD
 
 - **Önceden (çevrimdışı):** Dünya'nın karasal yüzeyi 60 km'lik pencerelere bölünür. Her pencerenin özellikleri bir kez hesaplanıp bir katalog dosyasına yazılır (`scripts/build_catalog.py`).
 - **Sorguda (çevrimiçi):** Kullanıcı bir Mars veya Ay bölgesi seçtiğinde yalnızca o pencerenin DEM'i okunur ve özellikleri hesaplanır. Ardından katalogdaki bütün pencerelerle bellekte karşılaştırılır. Bu birkaç saniye sürer.
+
+Belgenin geri kalanında her adımı aynı örnekle izliyoruz: **Jezero Krateri (18,38°K, 77,58°D) için Dünya'da analog aramak.**
 
 ## 3. Veri kaynakları ve görevleri
 
@@ -91,11 +100,34 @@ Bu yüzden her DEM, analiz ölçeğine (s = 1, 2 veya 4 km) bir Gauss filtresiyl
 - Filtre boş hücreleri yok sayar. Verinin yarıdan azını gören hücreler boş bırakılır.
 - Ölçek, kaynak pikselin en az 1,9 katı olmalıdır; değilse hesap reddedilir. MOLA için en küçük ölçek yaklaşık 880 m olduğundan 1 km uygundur.
 
+**Örnek (1 km ölçek):** Hedef σ = 0,5 × 1.000 m = 500 m.
+
+| Kaynak | Piksel (d) | Pikselin taşıdığı varyans d²/12 | Uygulanan σ |
+|---|---|---|---|
+| MOLA (Jezero) | 463 m | 17.871 m² | √(500² − 17.871) ≈ 482 m |
+| NASADEM 1″ (Salda) | 30 m | 75 m² | √(500² − 75) ≈ 500 m |
+
+MOLA'nın pikseli zaten kaba olduğu için ona daha az yumuşatma uygulanır, 30 m'lik veriye ise neredeyse tam 500 m uygulanır. Sonuçta ikisi aynı noktaya gelir.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="img/destek-esleme-dark.png">
+  <img src="img/destek-esleme.png" alt="Salda'nın ham 30 m ve 1 km destekli eğim haritaları ile Jezero'nun 1 km destekli eğim haritası" width="100%">
+</picture>
+
+*Şekil 2. Aynı Salda arazisi ham 30 m piksellerde ortalama 9,2° eğim gösteriyor, 1 km destekte 4,0°. Jezero 1 km destekte 2,4°. Ham piksellerle karşılaştırılsaydı Salda 3,3 kat daha dik görünürdü; doğru karşılaştırmada fark 1,7 kat.*
+
 ### 4.3 Yerel metrik ızgara
 
 Yumuşatılmış DEM, pencere merkezli ve kuzeyi yukarıda olan bir metre ızgarasına örneklenir. Bunun için gövdenin kendi yarıçapıyla azimutal eşit uzaklık izdüşümü kullanılır: Mars 3.396,19 km, Ay 1.737,4 km, Dünya 6.371,007 km. Dünya küre kabul edilir; 60 km içinde bunun hatası %0,4'ün altındadır ve DEM hatasından çok küçüktür.
 
 Hücre aralığı ölçeğe eşittir: 1 km'de 60 × 60, 2 km'de 30 × 30, 4 km'de 15 × 15 hücre. 1 km ızgaranın en az %95'i veriyle dolu değilse pencere geçersiz sayılır. Kalan küçük boşluklar en yakın değerle doldurulur.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="img/olcekler-dark.png">
+  <img src="img/olcekler.png" alt="Jezero penceresi 1, 2 ve 4 km ızgaralarda" width="100%">
+</picture>
+
+*Şekil 3. Jezero penceresi üç analiz ölçeğinde. 1 km'de krater kenarı belirgin, 4 km'de yalnızca büyük biçim kalıyor. Her ölçeğin özellikleri ayrı hesaplanır, böylece hem ayrıntı hem genel biçim karşılaştırmaya girer.*
 
 ### 4.4 Özellikler
 
@@ -115,6 +147,26 @@ Her pencere 21 sayıyla özetlenir. Her ölçekte 5 özellik hesaplanır (3 öl�
 
 Pencereye dik bir düzlem uydurulup çıkarılır, çünkü bölgesel eğim biçim gibi görünmemelidir. Testler, eğimli bir düzlem eklemenin ve yüksekliği topluca kaydırmanın biçim özelliklerini değiştirmediğini doğrular.
 
+**Örnek: Jezero ve Salda'nın pencere özellikleri**
+
+| Özellik | Jezero | Salda | Okuma |
+|---|---|---|---|
+| Ortalama eğim @ 1 km | 2,4° | 4,0° | Salda daha engebeli |
+| Yükselti farkı (P1–P99) | 957 m | 1.120 m | Toplam rölyef yakın |
+| Hipsometrik integral | 0,43 | 0,44 | Yükseklik dağılımı benzer |
+| Çarpıklık | 0,30 | 0,55 | |
+| Dairesel simetri R² | 0,58 | 0,16 | Jezero dairesel, Salda değil |
+| Havza derinliği | +429 m | −150 m | Jezero'da merkez kenardan alçak, Salda'da yüksek |
+
+Bu tablo, eğim ve rölyef yakın olsa bile son iki biçim özelliğinin iki bölgeyi neden ayırdığını gösterir.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="img/ozellikler-dark.png">
+  <img src="img/ozellikler.png" alt="Jezero ve Salda için eğim dağılımı, hipsometrik eğri ve radyal profil" width="100%">
+</picture>
+
+*Şekil 4. Özelliklerin dayandığı üç eğri. Eğim dağılımı: Jezero'da alanın %80'i 3°'nin altında. Hipsometrik eğri: ikisi neredeyse aynı. Radyal profil: Jezero'da yükseklik merkezden kenara 480 m artıyor (havza). Salda'da profil merkezden 9 km kadar yükselip sonra dışarı doğru düşüyor, yani kenarlar merkezden alçak.*
+
 ## 5. Dünya kataloğu
 
 `scripts/build_catalog.py`, `catalog.py` modülünü çalıştırır:
@@ -124,6 +176,13 @@ Pencereye dik bir düzlem uydurulup çıkarılır, çünkü bölgesel eğim biç
 3. **Eleme:** Yüzde 30'dan fazlası deniz olan (yükseklik 0 veya veri yok) ya da %95'ten azı geçerli olan pencereler atılır. Geriye 324.859 pencere kalır.
 4. **Özellikler:** Her pencerenin 21 özelliği 8 paralel süreçte hesaplanır. Pencerenin WorldCover sınıf payları da eklenir: ağaç, çalı, çayır, tarım, yerleşim, çıplak zemin, kar, su, sulak alan, mangrov ve yosun. Bu paylar WorldCover'ın 1/64'lük önizlemesinden (yaklaşık 640 m örnekler, pencere başına yaklaşık 10.000 örnek) okunur.
 5. **Çıktı:** `data/catalog/earth_global.parquet` dosyasında her satır bir penceredir. Yanındaki `.json` dosyası üretim zamanını, bölgeleri, pencere ve adım boyunu, ölçekleri, özellik listesini, yöntemi, veri kaynaklarını, yazılım sürümlerini, başarısız karoları ve süreleri kaydeder.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="img/katalog-dark.png">
+  <img src="img/katalog.png" alt="Dünya kataloğundaki pencere merkezlerinin haritası" width="100%">
+</picture>
+
+*Şekil 5. Katalogdaki 324.859 pencerenin merkezleri. Mavi olanlar çıplak zemin filtresinden geçen 48.763 pencere: Sahra, Arabistan, İran, Orta Asya, Atacama, Namibya, ABD'nin güneybatısı ve Avustralya'nın kurak bölgeleri. Turuncu halkalar Jezero için bulunan ilk 10 aday.*
 
 Sıfırdan üretim yaklaşık 45 dakika sürer. Önbellek doluysa birkaç dakika yeter. Uygulama özellik listesini kataloğun `.json` dosyasından okur, bu yüzden yeni özellikler eklenmiş bir katalog uygulamada kod değişikliği gerektirmeden çalışır.
 
@@ -146,6 +205,49 @@ Kod `similarity.py` dosyasındadır.
    - **Aile uyumu:** Her ailenin kendi fark değeri d_f, 100 × e^(−d_f) olarak gösterilir.
    - **Özellik katkısı:** wᵢ Δzᵢ² / Σ. Farkın en çok hangi özellikten geldiğini söyler.
 
+### Örnek: Jezero için arama
+
+324.859 pencerenin 48.763'ü çıplak zemin filtresinden geçer. Hepsinin Jezero'ya mesafesi hesaplanır:
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="img/mesafe-dagilimi-dark.png">
+  <img src="img/mesafe-dagilimi.png" alt="Bütün Dünya pencerelerinin Jezero'ya mesafe dağılımı" width="100%">
+</picture>
+
+*Şekil 6. Pencerelerin çoğu Jezero'dan 2 birim kadar uzakta. En yakın aday 0,21'de, dağılımın en ucunda duruyor. Salda 2,39 ile pencerelerin %88'inden daha uzak.*
+
+En yakın aday Çin'in Sincan bölgesindeki bir kapalı havza (43,47°K, 91,62°D). Göstergeleri şöyle:
+
+- Mesafe d = 0,208, yani benzerlik = 100 × e^(−0,208) ≈ **81**.
+- Yüzdelik **%99,999**: Taranan pencerelerin neredeyse hepsinden daha yakın.
+- Kararlılık **%100**: 300 rastgele ağırlık denemesinin hepsinde en yakın %0,1 içinde kaldı.
+- Aile uyumu: eğim 82, engebelilik 93, rölyef 89, biçim 74.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="img/adaylar-dark.png">
+  <img src="img/adaylar.png" alt="Jezero ve ona en yakın beş Dünya penceresinin gölgelendirilmiş rölyefi" width="100%">
+</picture>
+
+*Şekil 7. Jezero ve en yakın beş Dünya penceresi, aynı ölçekte. Adayların hepsi kenarları yüksek, tabanı düz havzalar; dairesel krater değiller. Bunun nedeni mevcut biçim ölçülerinin dönmeden bağımsız özet istatistikler olmasıdır (bkz. [Sınırlamalar](#12-sınırlamalar)).*
+
+Farkın kaynakları özellik katkısı tablosundan okunur. En büyük dört katkı:
+
+| Özellik | Jezero | Aday | z farkı | Ağırlık | Katkı |
+|---|---|---|---|---|---|
+| Dairesel simetri R² | 0,585 | 0,536 | −0,43 | 0,075 | %32 |
+| Yükseklik çarpıklığı | 0,300 | 0,034 | −0,28 | 0,075 | %13 |
+| Havza derinliği | 429 m | 481 m | +0,26 | 0,075 | %12 |
+| Eğim std. sapması @ 2 km | 1,90° | 1,37° | −0,33 | 0,040 | %10 |
+
+Biçim ailesinin 0,30'luk ağırlığı dört üyesine bölündüğü için her biri 0,075 alır. Eğim ailesinin 0,30'u ise 9 üyeye bölünür ve 1 km üyeleri yarım sayılır, bu yüzden 2 km'deki bir eğim özelliği 0,04 alır. Katkı = ağırlık × (z farkı)², bütün özelliklerin toplamına bölünmüş hâli.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="img/katki-dark.png">
+  <img src="img/katki.png" alt="En yakın aday ile Jezero arasındaki farka özelliklerin katkısı" width="100%">
+</picture>
+
+*Şekil 8. Farkın üçte biri dairesel simetriden geliyor: aday Jezero kadar yuvarlak değil.*
+
 ## 7. Yüzey ve güvenilirlik katmanları
 
 ### 7.1 Sentinel-2 yüzey kontrolü (`surface.py`)
@@ -160,9 +262,23 @@ Yalnızca kullanıcı seçili aday için düğmeye bastığında çalışır.
   - SWIR B11/B12 oranı. Kil ve karbonat gibi bazı mineraller SWIR2'de soğurma yaptığı için bir ipucu verir, ama tek başına mineral tanımlamaz.
   - Kapsama: pencerenin kullanılabilir piksel payı.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="img/sentinel2-dark.png">
+  <img src="img/sentinel2.png" alt="En yakın adayın Sentinel-2 gerçek renkli görüntüsü" width="60%">
+</picture>
+
+*Şekil 9. Jezero'nun en yakın adayı Sentinel-2'de. Medyan NDVI 0,05, yani bitki örtüsü yok denecek kadar az. Açık renkli düz bir tabana inen yelpaze ve kanal izleri görülüyor; bu görsel bir yorumdur, saha verisiyle doğrulanmamıştır. Sağdaki ve alttaki siyah alan, sahnenin pencereyi kapsamadığı kısım: seçilen sahne bir MGRS karosunun kenarında kalıyor.*
+
 ### 7.2 MOLA veri desteği (`mola_support.py`)
 
 MOLA'nın 463 m'lik hücrelerinin çoğu, yörünge izleri arasından enterpolasyonla doldurulmuştur. MEGDR "counts" ürünü her hücreye kaç lazer atımı düştüğünü söyler. Uygulama, seçilen Mars penceresinde gerçek ölçümü olan hücrelerin payını gösterir; Jezero'da bu oran %32,9'dur. 1 km özelliklerinin yarım ağırlık almasının nedeni budur.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="img/mola-izleri-dark.png">
+  <img src="img/mola-izleri.png" alt="Jezero çevresinde lazer ölçümü olan MOLA hücreleri" width="55%">
+</picture>
+
+*Şekil 10. Mavi hücrelerde en az bir lazer ölçümü var. Ölçümler kuzey–güney yönlü yörünge izleri boyunca diziliyor; aradaki boşluklar enterpolasyonla doldurulmuş. Kör arama deneyi bu deseni Dünya pencerelerine uygulayarak yöntemin bu eksikliğe ne kadar dayanıklı olduğunu ölçer.*
 
 ### 7.3 Güvenilirlik deneyleri (`validation.py`, notebook)
 
@@ -178,6 +294,10 @@ Literatürde geçen 15 Dünya analogu, neyin analoğu oldukları notuyla birlikt
 
 Canlı sürüm Streamlit Community Cloud'da çalışır. Yerelde `streamlit run app/streamlit_app.py` ile açılır (kurulum için README'ye bakın). Bir alan ilk kez seçildiğinde DEM okunurken bir dakikaya kadar beklemek gerekebilir; sonraki açılışlar önbellekten gelir.
 
+![Uygulamanın üst bölümü: kenar çubuğu, Jezero'nun geniş görünümü ve uyarılar](img/uygulama-ust.jpg)
+
+*Şekil 11. Uygulama Jezero seçiliyken. Solda ayarlar; sağda Jezero'nun Viking mozaiği üzerindeki penceresi (turuncu kare) ve iki uyarı: MOLA verisinin yalnızca %33'ü gerçek ölçüm, iki biçim özelliği de Dünya'da nadir.*
+
 ### Sol panel
 
 1. **Gezegen:** Mars veya Ay.
@@ -191,12 +311,21 @@ Canlı sürüm Streamlit Community Cloud'da çalışır. Yerelde `streamlit run 
 1. **Geniş görünüm:** Seçilen bölgenin yakınlaştırılabilir haritası. Turuncu kare, karşılaştırılan 60 km'lik penceredir.
 2. **Uyarılar:** Mars için gerçek lazer ölçümü payı; referansın Dünya'da nadir görülen özellikleri.
 3. **En yakın adaylar:** Sıra, konum, benzerlik, yüzdelik, kararlılık ve çıplak zemin payı tablosu. Yanında Dünya haritası var; uydu görüntüsüne katman menüsünden geçilir.
+
+   ![Aday listesi ve Dünya haritası](img/uygulama-adaylar.jpg)
+
+   *Şekil 12. Jezero için ilk 10 aday. Altındaki seçim kutusu, raporu hangi aday için göstereceğini belirler.*
+
 4. **Karşılaştırma raporu:** Seçilen aday için şunları içerir:
    - özet cümle,
    - iki pencerenin aynı fiziksel ölçekte, kuzeyi yukarıda gölgelendirilmiş rölyefi,
    - aile uyumu çubukları,
    - üç grafik: 1 km'de eğim dağılımı, hipsometrik eğri, radyal profil,
    - her özelliğin farka katkısını gösteren tablo.
+
+   ![Karşılaştırma raporu](img/uygulama-rapor.jpg)
+
+   *Şekil 13. 1 numaralı adayın raporu. En iyi uyum engebelilik ailesinde (93), en büyük fark dairesel simetride.*
 5. **Sentinel-2:** Düğmeye basınca sahne, NDVI, NDMI ve SWIR göstergeleri gelir.
 6. **Literatürdeki analoglar:** 15 alanın bu referansa uzaklığı.
 7. **Bilimsel izlenebilirlik:** Yöntem, referans DEM, katalog tarihi ve parametreleri, başarısız karolar, veri kaynakları, yazılım sürümleri ve sınırlamalar.
@@ -206,6 +335,17 @@ Canlı sürüm Streamlit Community Cloud'da çalışır. Yerelde `streamlit run 
 - Yüksek yüzdelik ve yüksek kararlılık birlikte sağlam bir eşleşme gösterir. Kararlılığı düşük bir aday ağırlık seçimine duyarlıdır.
 - Özellik tablosu "neden" sorusunu yanıtlar. Toplam farkın büyük kısmı tek bir özellikten geliyorsa o özelliğe bakın.
 - Benzerlik yalnızca arazi biçimini ölçer. Jeoloji, mineraloji ve oluşum süreci aynı olmayabilir.
+
+### Örnek senaryo: rover için yürünebilir bir analog
+
+Bir ekip, Jezero tabanına benzeyen ve araç testine uygun bir Dünya bölgesi arıyor olsun:
+
+1. Gezegen olarak Mars'ı, alan olarak Jezero Krateri'ni seçin.
+2. Araç için eğim önemli olduğundan **Eğim** ağırlığını artırın, örneğin 30'dan 60'a.
+3. Çıplak zemin filtresini açık bırakın. Gerekirse "En az çıplak zemin" eşiğini 0,7'ye çıkarın.
+4. Listede yüzdeliği ve kararlılığı yüksek adayları seçip raporunda eğim dağılımı grafiğine bakın: turuncu ve mavi eğriler yakınsa eğim yapısı benzer demektir.
+5. Sentinel-2 düğmesiyle yüzeyin gerçekten çıplak olup olmadığını kontrol edin.
+6. "Literatürdeki analoglar" tablosunda bilinen test alanlarının aynı ağırlıklarla nerede durduğuna bakın.
 
 ## 9. Notebook, komut satırı ve Python
 
@@ -219,6 +359,8 @@ Canlı sürüm Streamlit Community Cloud'da çalışır. Yerelde `streamlit run 
 ```
 
 Seçenekler: `--window-km` (varsayılan 60), `--stride-km` (20), `--workers` (8 süreç), `--threads` (12 bağlantı).
+
+**Belgenin şekilleri:** `python scripts/make_doc_figures.py` bu belgedeki şekilleri gerçek veriden, açık ve koyu tema için yeniden üretir ve örneklerdeki sayıları yazdırır. Yöntem değiştiğinde belgeyi güncel tutmak için kullanın. Uygulama ekran görüntüleri (`docs/img/uygulama-*.jpg`) elle alınmıştır.
 
 **Testler:** `pytest` ağ gerektirmeyen testleri, `pytest -m network` gerçek uzak verilerle çalışan testleri koşturur. `tests/test_terrain.py` analitik yanıtı bilinen yapay arazileri, `tests/test_similarity.py` doğru cevabı bilinen yapay bir kataloğu, `tests/test_data_layers.py` karo birleştirme, deniz karoları, WorldCover ve MOLA okumayı sınar.
 
